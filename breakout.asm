@@ -42,6 +42,9 @@ BALL:
 	.space 4	#reserve space for direction of ball
 	.space 4	#reserve space for speed of ball
 	.space 4	#reserve space for colour of ball
+
+BRICK_ARRAY
+	.word
 ##############################################################################
 # Code
 ##############################################################################
@@ -109,45 +112,109 @@ draw_walls:
 # draw left wall 
 
 
-# draw top wall (4 lines from x = 4 -> x = 59) 
-	li $a0, 4 # x_value
-	li $a1, 0 # y_value
-	jal get_location_address # returns loc_addrsss in $v0
-	add $t0, $v0, $zero # store starting location for first row
-	
-	addi $a1, $a1, 256 # add 1 row to y_value
-	jal get_location_address # returns loc_addrsss in $v0
-	add $t1, $v0, $zero # store starting location for second row
-	
-	addi $a1, $a1, 256 # add 1 row to y_value
-	jal get_location_address # returns loc_addrsss in $v0
-	add $t2, $v0, $zero # store starting location for third row
-	
-	addi $a1, $a1, 256 # add 1 row to y_value 
-	jal get_location_address # returns loc_addrsss in $v0
-	add $t3, $v0, $zero # store starting location for fourth row
-	
-	
-	add $a0, $t0, $zero # prepare to call draw_line with start position (0, 4)
-	la $a1, COLOURS # colour
-	addi $a1, $a1, 36
-	li $a2, 55 # draw 56 units across (units 4 - 60)
-	jal draw_line # draw first row
-	# TODO: NEED TO SAVE TEMP VALUES FROM ABOVE IN MEMORY because draw_line overwrites $t0, $t1 ...
-	add $a0, $t2, $zero
-	jal draw_line # draw second row
-	add $a0, $t3, $zero
-	jal draw_line # draw third row
-	add $a0, $t4, $zero
-	jal draw_line # draw fourth row
+
 	
 
 
 # draw right wall
 	
-	
-draw_walls_loop:
+	#PROLOGUE
+	addi $sp, $sp, -16
+	sw $s2, 12($sp)
+	sw $s1, 8($sp)
+	sw $s0, 4($sp)
+	sw $ra, 0($sp)
 
+
+
+		# draw top wall (4 lines from x = 4 -> x = 59) 
+	li $a0, 4 # x_value
+	li $a1, 0 # y_value
+	jal get_location_address # returns loc_address in $v0
+	
+	add $a0, $v0, $0 # store starting location for first 
+	addi $s2, $a0, 0
+	
+	la $a1, COLOURS
+	addi $a1, $a1, 36 # set colour address for border colour
+	
+	li $a2, 56 # draw line 56 units wide
+	
+	
+	li $s0, 0	# i = 0
+	li $s1, 4	
+draw_top_wall_loop:
+	slt $t1, $s0, $s1	# i < 4
+	beq $t1, $0, draw_left_wall
+	
+		addi $a0, $s2, 0
+		jal draw_line
+		addi $s2, $s2, 256 	# go to next row (512/8 pixels per unit = 64 units * 4 bytes per unit = 256)
+	
+	addi $s0, $s0, 1	# i = i + 1
+	j draw_top_wall_loop
+		
+draw_left_wall:
+	la $a0, ADDR_DSPL 	# store starting location for first
+	lw $a0, 0($a0)
+	addi $s2, $a0, 0	
+	
+	la $a1, COLOURS
+	addi $a1, $a1, 36 	# set colour address for border colour
+	
+	li $a2, 4 	# draw line 4 units wide
+	
+	li $s0, 0	# i = 0
+	li $s1, 64
+	
+	
+draw_left_wall_loop:
+	slt $t1, $s0, $s1	# i < 64
+	beq $t1, $0, draw_right_wall
+		
+		addi $a0, $s2, 0
+		jal draw_line
+		addi $s2, $s2, 256	# go to next row (512/8 pixels per unit = 64 units * 4 bytes per unit = 256)
+	
+	addi $s0, $s0, 1	# i = i + 1
+	j draw_left_wall_loop
+	
+draw_right_wall:
+	li $a0, 60 # x_value
+	li $a1, 0 # y_value
+	jal get_location_address # returns loc_address in $v0
+	
+	add $a0, $v0, $0 # store starting location for first 
+	addi $s2, $a0, 0	
+	
+	la $a1, COLOURS
+	addi $a1, $a1, 36 	# set colour address for border colour
+	
+	li $a2, 4 	# draw line 4 units wide
+	
+	li $s0, 0	# i = 0
+	li $s1, 64
+draw_right_wall_loop:
+	slt $t1, $s0, $s1	# i < 64
+	beq $t1, $0, draw_wall_epi
+		
+		addi $a0, $s2, 0
+		jal draw_line
+		addi $s2, $s2, 256	# go to next row (512/8 pixels per unit = 64 units * 4 bytes per unit = 256)
+	
+	addi $s0, $s0, 1	# i = i + 1
+	j draw_right_wall_loop
+
+draw_wall_epi:
+	#EPILOGUE
+	lw $ra, 0($sp)
+	lw $s0, 4($sp)
+	lw, $s1, 8($sp)
+	lw, $s2, 12($sp)
+	addi $sp, $sp, 16
+	
+	jr $ra
+	
 
 
 
