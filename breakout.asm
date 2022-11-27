@@ -40,7 +40,9 @@ ADDR_KBRD:
 ##############################################################################
 BALL:
 	.space 8	#reserve space for x and y coords of ball
-	.space 4	#reserve space for direction of ball
+	.space 8	#reserve space for x and y direction of ball
+			# x direction is -1 for left, 1 for right
+			# y direction is -1 for up, 1 for down
 	.space 4	#reserve space for speed of ball
 	.space 4	#reserve space for colour of ball
 
@@ -75,8 +77,15 @@ main:
     sw, $t1, 0($t0)
     addi $t1, $0, 54
     sw $t1, 4($t0)
+    addi $t1, $0, -1
+    sw, $t1, 8($t0)
+    addi $t1, $0, -1
+    sw $t1, 12($t0)
     
-    jal draw_screen
+    jal draw_walls
+    jal draw_bricks
+    jal draw_paddle
+    jal draw_ball
     
     j game_loop
     
@@ -287,9 +296,9 @@ draw_brick_loop:
 	addi $t3, $0, 56	# once end of row is reached (56 units), go to next row
 	div $s0, $t3
 	mfhi $t4
-	beq $t4, $0, else
+	beq $t4, $0, draw_bricks_next_row
 	j draw_brick_loop
-else:
+draw_bricks_next_row:
 	addi $s2, $s2, 288	# go to next row (+ 2 lines)	TODO FIGURE OUT WHY 
 	j draw_brick_loop
 		
@@ -303,12 +312,16 @@ draw_bricks_epi:
 	
 	jr $ra
 
-# draw_paddle()
-#   Draw a paddle on the display at position (x, 56)
+# draw_paddle(erase)
+#   Draw a paddle on the display at position (x, 56). If erase
+#   is 1, draw paddle in black
 draw_paddle:
 	#PROLOGUE
-	addi $sp, $sp, -4
+	addi $sp, $sp, -8
+	sw $s0, 4($sp)
 	sw $ra, 0($sp)
+	
+	addi $s0, $a0, 0	# store erase value
 	
 	la $a0, PADDLE
 	lw $a0, 0($a0)
@@ -317,9 +330,16 @@ draw_paddle:
 	jal get_location_address	# returns loc_address in $v0
 	add $a0, $v0, $0
 	
+	beq $s0, 1, erase_paddle
 	la $a1, COLOURS
 	addi $a1, $a1, 28 	# set colour address for paddle colour
+	b draw_paddle_cont
 	
+erase_paddle:
+	la $a1, COLOURS
+	addi $a1, $a1, 32	
+
+draw_paddle_cont:	
 	li $a2, 6	# paddle 6 units wide
 	
 	jal draw_line
@@ -327,17 +347,21 @@ draw_paddle:
 	
 	#EPILOGUE
 	lw $ra, 0($sp)
+	lw $s0, 4($sp)
 	addi $sp, $sp, 4
 	
 	jr $ra
 
-# draw_ball()
-#   Draw the ball on the display
+# draw_ball(erase)
+#   Draw the ball on the display. If erase is 1, draw ball in black.
 #
 draw_ball:
 	# PROLOGUE
-	addi $sp, $sp, -4
+	addi $sp, $sp, -8
+	sw $s0, 4($sp)
 	sw $ra, 0($sp)
+	
+	addi $s0, $a0, 0	# store erase value
 	
 	la $t0, BALL
 	lw $a0, 0($t0)		# get x from ball
@@ -345,15 +369,23 @@ draw_ball:
 	
 	jal get_location_address
 	
+	beq $s0, 1, erase_ball
 	la $t1, COLOURS		# get colour of ball
 	addi $t1, $t1, 40
 	lw $t1, 0($t1)
+	b draw_ball_cont
+erase_ball:
+	la $t1, COLOURS		# make ball black
+	addi $t1, $t1, 32
+	lw $t1, 0($t1)
 	
+draw_ball_cont:
 	sw $t1, 0($v0)		# draw ball at unit
 	
 	# EPILOGUE
 	lw $ra, 0($sp)
-	addi $sp, $sp, 4
+	lw $s0, 4($sp)
+	addi $sp, $sp, 8
 	
 	jr $ra
 game_loop:
@@ -361,7 +393,8 @@ game_loop:
 	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     	lw $t8, 0($t0)                  # Load first word from keyboard
     	beq $t8, 1, keyboard_input      # If first word 1, key is pressed
-    	b game_loop
+    	
+    	b refresh_ball
     # 1b. Check which key has been pressed
 keyboard_input:                     # A key is pressed
     	lw $a0, 4($t0)                  # Load second word from keyboard
@@ -372,7 +405,7 @@ keyboard_input:                     # A key is pressed
     	li $v0, 1                       # ask system to print $a0
     	syscall
 
-    b main
+    	b refresh_ball
 
 respond_to_Q:
 	li $v0, 10                      # Quit gracefully
@@ -380,35 +413,74 @@ respond_to_Q:
     # 2a. Check for collisions
 	# 2b. Update locations (paddle, ball)
 respond_to_A:
+	li $a0, 1
+	jal draw_paddle		# erase paddle
+	
 	la $t0, PADDLE		# update paddle coord
 	lw $t1, 0($t0)
 	#TODO case where paddle is at edge of screen
+	beq $t1, 4, paddle_max_left
 	subi $t1, $t1, 1	# shift paddle 1 unit left	
 	sw $t1, 0($t0)
-	
-	j draw_screen
+
+paddle_max_left:
+	b refresh_paddle
 	
 respond_to_D:
+	li $a0, 1
+	jal draw_paddle		# erase paddle
+	
 	la $t0, PADDLE		# update paddle coord
 	lw $t1, 0($t0)
 	#TODO case where paddle is at edge of screen
+	beq $t1, 54, paddle_max_right
 	addi $t1, $t1, 1	# shift paddle 1 unit right	
 	sw $t1, 0($t0)
+paddle_max_right:
 	
-	j draw_screen
+	b refresh_paddle
 	
 	# 3. Draw the screen
-draw_screen:
-	jal draw_walls
-    	jal draw_bricks
-    	jal draw_paddle
-    	jal draw_ball
+refresh_paddle:
+	
+	li $a0, 0
+	jal draw_paddle
+	
+	b refresh_ball
+
+refresh_ball:
+	
+	li $a0, 1
+	jal draw_ball
+	
+	la $t0, BALL
+	lw $t1, 0($t0)		# get x from ball
+	lw $t2, 4($t0)		# get y from ball
+	lw $t3, 8($t0)		# get x direction from ball
+	lw $t4, 12($t0)		# get y direction from ball
+	
+	add $t1, $t1, $t3	# update coords
+	add $t2, $t2, $t4
+	sw $t1, 0($t0)
+	sw $t2, 4($t0)
+	
+	li $a0, 0
+	jal draw_ball
+	
+	li $v0, 32
+	li $a0, 25
+	syscall
+	
+	b sleep
+	
+	
+	
     	
 	# 4. Sleep
+sleep:
 	li $v0, 32
-	li $a0, 1000
+	li $a0, 25
+	syscall
 	
-	
-
-    #5. Go back to 1
-    b game_loop
+    	#5. Go back to 1
+    	b game_loop
