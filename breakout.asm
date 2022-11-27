@@ -1,7 +1,7 @@
 ################ CSC258H1F Fall 2022 Assembly Final Project ##################
 # This file contains our implementation of Breakout.
 #
-# Student 1: Name, Student Number
+# Student 1: Brian Chen, 1008157879
 # Student 2: John Fitzgerald, 1008155513
 ######################## Bitmap Display Configuration ########################
 # - Unit width in pixels:       8
@@ -22,9 +22,10 @@ COLOURS:
 	.word 0x49da9a	#jade (16)
 	.word 0x34bbe6	#sky (20)
 	.word 0x4355db	#blue (24)
-	.word 0xd23be7 #purple (28)
+	.word 0xd23be7 #lean (28)
 	.word 0x000000	#black (32)
-	.word 0xfffdd0	#lean (36)
+	.word 0xfffdd0	#cream (36)
+	.word 0x2a9d8f	#jungle (40)
 	
 ##############################################################################
 # The address of the bitmap display. Don't forget to connect it!
@@ -38,10 +39,15 @@ ADDR_KBRD:
 # Mutable Data
 ##############################################################################
 BALL:
-	.space 8	#reserve space for x and y coords of ball
-	.space 4	#reserve space for direction of ball
-	.space 4	#reserve space for speed of ball
-	.space 4	#reserve space for colour of ball
+	.word 2
+	.word 4
+	#.space 8	#reserve space for x and y coords of ball
+	#.space 4	#reserve space for direction of ball
+	#.space 4	#reserve space for speed of ball
+	#.space 4	#reserve space for colour of ball
+
+PADDLE:
+	.space 8	#reserve space for x and y coords of paddle
 
 BRICK_ARRAY:
 	.word 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f
@@ -62,6 +68,21 @@ main:
     # Initialize the game
     jal draw_walls
     jal draw_bricks
+    
+    li $a0, 29
+    jal draw_paddle
+    
+    la $t0, BALL
+    addi $t1, $0, 31
+    sw, $t1, 0($t0)
+    addi $t1, $0, 54
+    sw $t1, 4($t0)
+    
+    jal draw_ball
+    
+    j game_loop
+    
+    
 
 
 
@@ -70,8 +91,8 @@ main:
 #   Return the address of the unit on the display at location (x,y)
 #
 #   Preconditions:
-#       - x is between 0 and 64, inclusive
-#       - y is between 0 and 64, inclusive
+#       - x is between 0 and 63, inclusive
+#       - y is between 0 and 63, inclusive
 get_location_address:
 	# BODY
 	sll $a0, $a0, 2 # x_bytes = x * 4
@@ -116,14 +137,6 @@ draw_line_epi:
 #   Draw the walls of the breakout game on the display
 #
 draw_walls:
-# draw left wall 
-
-
-
-	
-
-
-# draw right wall
 	
 	#PROLOGUE
 	addi $sp, $sp, -16
@@ -247,10 +260,9 @@ draw_bricks:
 	
 	li $s0, 0	# i = 0
 	li $s1, 393	# 98 bricks x 4 bytes to get to next brick = 392
-	li $s3, 0
 draw_brick_loop:
 	slt $t1, $s0, $s1	# i < 64
-	beq $t1, $0, end_brick_loop
+	beq $t1, $0, draw_bricks_epi
 	
 		la $a1, BRICK_ARRAY	# get colour of brick from array
 		add $a1, $a1, $s0
@@ -283,7 +295,7 @@ else:
 	addi $s2, $s2, 288	# go to next row (+ 2 lines)	TODO FIGURE OUT WHY 
 	j draw_brick_loop
 		
-end_brick_loop:
+draw_bricks_epi:
 	#EPILOGUE
 	lw $ra, 0($sp)
 	lw $s0, 4($sp)
@@ -292,10 +304,61 @@ end_brick_loop:
 	addi $sp, $sp, 16
 	
 	jr $ra
+
+# draw_paddle(x)
+#   Draw a paddle on the display at position (x, 56)
+#
+#   Preconditions:
+#       - The position can "accommodate" a 6 unit wide paddle
+#	- x is between 4 and 59, inclusive
+draw_paddle:
+	#PROLOGUE
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
 	
+	li $a1, 55	# set y to 55
+	jal get_location_address	# returns loc_address in $v0
+	add $a0, $v0, $0
+	
+	la $a1, COLOURS
+	addi $a1, $a1, 28 	# set colour address for paddle colour
+	
+	li $a2, 6	# paddle 6 units wide
+	
+	jal draw_line
+	
+	
+	#EPILOGUE
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra
 
-draw_bricks_epi:
-
+# draw_ball()
+#   Draw the ball on the display
+#
+draw_ball:
+	# PROLOGUE
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	la $t0, BALL
+	lw $a0, 0($t0)		# get x from ball
+	lw $a1, 4($t0)		# get y from ball
+	
+	jal get_location_address
+	
+	la $t1, COLOURS		# get colour of ball
+	addi $t1, $t1, 40
+	lw $t1, 0($t1)
+	
+	sw $t1, 0($v0)		# draw ball at unit
+	
+	# EPILOGUE
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra
 game_loop:
 	# 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
