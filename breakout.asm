@@ -266,7 +266,7 @@ draw_bricks:
 	
 	
 	li $s0, 0	# i = 0
-	li $s1, 393	# 98 bricks x 4 bytes to get to next brick = 392
+	li $s1, 392	# 98 bricks x 4 bytes to get to next brick = 392
 draw_brick_loop:
 	slt $t1, $s0, $s1	# i < 64
 	beq $t1, $0, draw_bricks_epi
@@ -394,7 +394,7 @@ game_loop:
     	lw $t8, 0($t0)                  # Load first word from keyboard
     	beq $t8, 1, keyboard_input      # If first word 1, key is pressed
     	
-    	b refresh_ball
+    	b detect_collision
     # 1b. Check which key has been pressed
 keyboard_input:                     # A key is pressed
     	lw $a0, 4($t0)                  # Load second word from keyboard
@@ -411,7 +411,85 @@ respond_to_Q:
 	li $v0, 10                      # Quit gracefully
 	syscall
     # 2a. Check for collisions
+detect_collision:
+	#PROLOGUE
+		addi $sp, $sp, -16
+		sw $s3, 12($sp)
+		sw $s2, 8($sp)
+		sw $s1, 4($sp)
+		sw $s0, 0($sp)
+	
+	# $s0 = x, $s1 = y, $s2 = x direction, $s3 = y direction
+	la $t0, BALL
+	lw $s0, 0($t0)	# get x value from ball
+	lw $s1, 4($t0)	# get y value from ball
+	lw $s2, 8($t0)	# get x direction
+	lw $s3, 12($t0)	# get y direction
+	
+	add $t0, $s0, $s2 		# check x left out of bounds
+	ble $t0, 3, corner_collision 	# branch to corner collision
+	bge $t0, 60, corner_collision	# check x right out of bounds
+					# branch to corner collision
+	add $t0, $s1, $s3		# check y out of bounds
+	ble $t0, 3, top_wall_collision # branch to top wall collision
+	b detect_collision_epi
+	
+	top_wall_collision:
+	# invert y direction
+	addi $t3, $s3, 0		# store value of y direction in temp
+	sub $s3, $s3, $t3		# simulate negation by subtracting by itself twice
+	sub $s3, $s3, $t3
+	la $t0, BALL
+	sw $s3, 12($t0)
+	b detect_collision_epi
+	
+	
+	wall_collision:
+	# invert x direction
+	addi $t2, $s2, 0		# store value of x direction in temp
+	sub $s2, $s2, $t2		# simulate negation by subtracting by itself twice
+	sub $s2, $s2, $t2
+	la $t0, BALL
+	sw $s2, 8($t0) 			# update x direction
+	sw $s3, 12($t0) 		# update y direction
+	b detect_collision_epi
+	
+	corner_collision:
+	add $t0, $s1, $s3 		# y + y direction
+	bge $t0, 4, wall_collision 	# check y in bounds
+				   	# if y in bounds, branch to wall
+	# TODO implement game-over check before this
+	# invert x direction
+	addi $t2, $s2, 0		# store value of x direction in temp
+	sub $s2, $s2, $t2		# simulate negation by subtracting by itself twice
+	sub $s2, $s2, $t2	
+	
+	# invert y direction
+	addi $t3, $s3, 0		# store value of y direction in temp
+	sub $s3, $s3, $t3		# simulate negation by subtracting by itself twice
+	sub $s3, $s3, $t3
+	
+	la $t0, BALL
+	sw $s2, 8($t0) 			# update x direction
+	sw $s3, 12($t0) 		# update y direction
+	b detect_collision_epi
+	
+	
+	paddle_collision:
+      
+	          
 	# 2b. Update locations (paddle, ball)
+	
+	# EPILOGUE
+	detect_collision_epi:
+		sw $s0, 0($sp)
+		sw $s1, 4($sp)
+		sw $s2, 8($sp)
+		sw $s3, 12($sp)
+		addi $sp, $sp, 16
+		b refresh_ball
+	
+	
 respond_to_A:
 	li $a0, 1
 	jal draw_paddle		# erase paddle
@@ -432,7 +510,7 @@ respond_to_D:
 	
 	la $t0, PADDLE		# update paddle coord
 	lw $t1, 0($t0)
-	#TODO case where paddle is at edge of screen
+	
 	beq $t1, 54, paddle_max_right
 	addi $t1, $t1, 1	# shift paddle 1 unit right	
 	sw $t1, 0($t0)
@@ -459,9 +537,9 @@ refresh_ball:
 	lw $t3, 8($t0)		# get x direction from ball
 	lw $t4, 12($t0)		# get y direction from ball
 	
-	add $t1, $t1, $t3	# update coords
-	add $t2, $t2, $t4
-	sw $t1, 0($t0)
+	add $t1, $t1, $t3	# update coords (x + x direction)
+	add $t2, $t2, $t4	# (y + y direction)
+	sw $t1, 0($t0)		# store the updated coords of the ball into memory
 	sw $t2, 4($t0)
 	
 	li $a0, 0
