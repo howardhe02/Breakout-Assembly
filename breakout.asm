@@ -22,9 +22,10 @@ COLOURS:
 	.word 0x49da9a	#jade (16)
 	.word 0x34bbe6	#sky (20)
 	.word 0x4355db	#blue (24)
-	.word 0xd23be7 #purple (28)
+	.word 0xd23be7 #lean (28)
 	.word 0x000000	#black (32)
-	.word 0xfffdd0	#lean (36)
+	.word 0xfffdd0	#cream (36)
+	.word 0x2a9d8f	#jungle (40)
 	
 ##############################################################################
 # The address of the bitmap display. Don't forget to connect it!
@@ -38,10 +39,12 @@ ADDR_KBRD:
 # Mutable Data
 ##############################################################################
 BALL:
-	.space 8	#reserve space for x and y coords of ball
-	.space 4	#reserve space for direction of ball
-	.space 4	#reserve space for speed of ball
-	.space 4	#reserve space for colour of ball
+	.word 2
+	.word 4
+	#.space 8	#reserve space for x and y coords of ball
+	#.space 4	#reserve space for direction of ball
+	#.space 4	#reserve space for speed of ball
+	#.space 4	#reserve space for colour of ball
 
 PADDLE:
 	.space 8	#reserve space for x and y coords of paddle
@@ -65,6 +68,21 @@ main:
     # Initialize the game
     jal draw_walls
     jal draw_bricks
+    
+    li $a0, 29
+    jal draw_paddle
+    
+    la $t0, BALL
+    addi $t1, $0, 31
+    sw, $t1, 0($t0)
+    addi $t1, $0, 54
+    sw $t1, 4($t0)
+    
+    jal draw_ball
+    
+    j game_loop
+    
+    
 
 
 
@@ -73,8 +91,8 @@ main:
 #   Return the address of the unit on the display at location (x,y)
 #
 #   Preconditions:
-#       - x is between 0 and 64, inclusive
-#       - y is between 0 and 64, inclusive
+#       - x is between 0 and 63, inclusive
+#       - y is between 0 and 63, inclusive
 get_location_address:
 	# BODY
 	sll $a0, $a0, 2 # x_bytes = x * 4
@@ -287,8 +305,60 @@ draw_bricks_epi:
 	
 	jr $ra
 
+# draw_paddle(x)
+#   Draw a paddle on the display at position (x, 56)
+#
+#   Preconditions:
+#       - The position can "accommodate" a 6 unit wide paddle
+#	- x is between 4 and 59, inclusive
 draw_paddle:
+	#PROLOGUE
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	li $a1, 55	# set y to 55
+	jal get_location_address	# returns loc_address in $v0
+	add $a0, $v0, $0
+	
+	la $a1, COLOURS
+	addi $a1, $a1, 28 	# set colour address for paddle colour
+	
+	li $a2, 6	# paddle 6 units wide
+	
+	jal draw_line
+	
+	
+	#EPILOGUE
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra
 
+# draw_ball()
+#   Draw the ball on the display
+#
+draw_ball:
+	# PROLOGUE
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	la $t0, BALL
+	lw $a0, 0($t0)		# get x from ball
+	lw $a1, 4($t0)		# get y from ball
+	
+	jal get_location_address
+	
+	la $t1, COLOURS		# get colour of ball
+	addi $t1, $t1, 40
+	lw $t1, 0($t1)
+	
+	sw $t1, 0($v0)		# draw ball at unit
+	
+	# EPILOGUE
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra
 game_loop:
 	# 1a. Check if key has been pressed
     # 1b. Check which key has been pressed
