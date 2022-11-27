@@ -113,6 +113,101 @@ get_location_address:
 	
 	# EPILOGUE
 	jr $ra
+	
+	
+	
+# get_brick_address(x, y) -> address, (x_start, y_start) [on stack]
+#   Return the address of the brick from the BRICK_ARRAY in memory
+#
+#   Preconditions:
+#       - x is between 4 and 59, inclusive
+#       - y is between 9 and 22, inclusive
+# arr_x = pos_x // 4 - 1
+# arr_y = (pos_x - 9) // 2	
+# the brick address is going to be the ith element in BRICK_ARRAY 
+# where i = arr_x + arr_y * 64
+# e.g. the first brick in the second row (from the top) will have x_arr = 0, y_arr = 1,
+# so it will be the 64th element in BRICK_ARRAY
+get_brick_address:
+	# BODY
+	srl $a0, $a0, 2 	# floor divide x by 4
+	subi $a0, $a0, 1	# subtract x by 1
+	addi $t0, $a0, 1 	# add 1
+	sll $t0, $t0, 2  	# mult 2 -> the x starting position of brick
+	addi $sp, $sp,  -4	# store starting x positions on stack
+	lw $t0, 0($sp)
+	
+	subi $a1, $a1, 1	# subtract y by 1
+	srl $a1, $a1, 1		# floor divide y by 2
+	
+	addi $t1, $a1, 0	# invert above steps
+	sll $t1, $t1, 2
+	addi $t1, $t1, 1 
+	addi $sp, $sp, -4   		# store starting y position on stack
+	lw $t0, 0($sp)
+	sll $a1, $a1, 6 	# multiply by 64
+	
+	add $t0, $a0, $a1 	# the index of the brick in BRICK_ARRAY
+	sll $t0, $t0, 2		# represent the index in terms of words (multiply by 4)
+	
+	
+	la $v0, BRICK_ARRAY
+	addi $v0, $t0, 0	# return the position of the brick in BRICK_ARRAY
+	
+	# EPILOGUE
+	jr $ra
+
+# erase_brick(start) -> void
+#   Erase a brick on the display starting from the start address
+#
+#   Preconditions:
+#       - The start address can "accommodate" a brick of size 4 x 2
+erase_brick:
+	# PROLOGUE
+	addi $sp, $sp, -20
+    sw $s3, 16($sp)
+    sw $s2, 12($sp)
+    sw $s1, 8($sp)
+    sw $s0, 4($sp)
+	sw $ra, 0($sp)
+
+    # BODY
+    # Arguments are not preserved across function calls, so we
+    # save them before starting the loop
+    addi $s0, $a0, 0
+    la $s1, COLOURS
+    lw $s1, 0($s1)
+    addi $s2, $s2, 2
+    
+
+    # Iterate 2 ($a2) times, drawing each line
+    li $s3, 0                   # i = 0
+erase_brick_loop:
+    slt $t0, $s3, $s2           # i < size ?
+    beq $t0, $0, erase_brick_epi# if not, then done
+
+        # call draw_line
+        addi $a0, $s0, 0 # start
+        addi $a1, $s1, 0 # colour_address
+        li $a2, 4	  # width = 4
+        jal draw_line
+
+        addi $s0, $s0, 256      # Go to next row
+
+    addi $s3, $s3, 1            # i = i + 1
+    b erase_brick_loop
+
+erase_brick_epi:
+    # EPILOGUE
+	lw		$ra, 0($sp)
+    lw      $s0, 4($sp)
+    lw      $s1, 8($sp)
+    lw      $s2, 12($sp)
+    lw      $s3, 16($sp)
+	addi	$sp, $sp, 20
+
+    jr $ra
+
 
 
 # draw_line(start, colour_address, width) -> void
@@ -426,6 +521,41 @@ detect_collision:
 	lw $s2, 8($t0)	# get x direction
 	lw $s3, 12($t0)	# get y direction
 	
+	add $t0, $s0, $s2 # x_next
+	add $t1, $s1, $s3 # y_next
+	ble $t0, 3, check_walls
+	bge $t0, 60, check_walls
+	ble $t0, 8, check_walls
+	bge $t0, 23, check_walls
+	
+	# x_next is between 4 and 59 inclusive and y_next is between 9 and 22 inclusive
+	# check for brick collision (3 conditions)
+		# check if ball next position is occupied by a brick using get_brick_address
+		# condition 1: hit top/bottom of brick -> delete and invert y direction
+			# moving vertically results in a collision
+			addi $a0, $s0, 0 	# load x
+			add $t1, $s1, $s3 	# y_next
+			addi $a1, $t1, 0	# load y_next
+			jal get_brick_address
+			addi $sp, $sp, 8
+			lw $a0, 0($sp)		# starting x of brick in units
+			lw $a1, 4($sp)		# starting y of brick in units
+			addi $t0, $v0, 0	# memory location of brick in BRICK_ARRAY
+			lw $v0, 0($v0)		# colour value of the brick
+			# if colour at this location isn't 0x000000, erase brick and invert y
+			beq $v0, 0, check_walls	# no brick present
+			jal get_location_address
+			addi $a0, $v0, 0
+			jal erase_brick
+			b detect_collision_epi
+			
+		
+		# condition 2: hit side of brick -> delete and invert x direction
+			# moving horizontally results in a collision
+		# condition 3: hit corner of brick -> delete and invert both directions
+			# moving in both axes results in a collision
+		
+	check_walls:	
 	add $t0, $s0, $s2 		# check x left out of bounds
 	ble $t0, 3, corner_collision 	# branch to corner collision
 	bge $t0, 60, corner_collision	# check x right out of bounds
