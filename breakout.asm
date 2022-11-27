@@ -39,15 +39,13 @@ ADDR_KBRD:
 # Mutable Data
 ##############################################################################
 BALL:
-	.word 2
-	.word 4
-	#.space 8	#reserve space for x and y coords of ball
-	#.space 4	#reserve space for direction of ball
-	#.space 4	#reserve space for speed of ball
-	#.space 4	#reserve space for colour of ball
+	.space 8	#reserve space for x and y coords of ball
+	.space 4	#reserve space for direction of ball
+	.space 4	#reserve space for speed of ball
+	.space 4	#reserve space for colour of ball
 
 PADDLE:
-	.space 8	#reserve space for x and y coords of paddle
+	.space 4	#reserve space for x coord of paddle
 
 BRICK_ARRAY:
 	.word 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f
@@ -66,11 +64,11 @@ BRICK_ARRAY:
 	# Run the Brick Breaker game.
 main:
     # Initialize the game
-    jal draw_walls
-    jal draw_bricks
     
-    li $a0, 29
-    jal draw_paddle
+    la $t0, PADDLE
+    addi $t1, $0, 29
+    sw, $t1, 0($t0)
+
     
     la $t0, BALL
     addi $t1, $0, 31
@@ -78,7 +76,7 @@ main:
     addi $t1, $0, 54
     sw $t1, 4($t0)
     
-    jal draw_ball
+    jal draw_screen
     
     j game_loop
     
@@ -305,16 +303,15 @@ draw_bricks_epi:
 	
 	jr $ra
 
-# draw_paddle(x)
+# draw_paddle()
 #   Draw a paddle on the display at position (x, 56)
-#
-#   Preconditions:
-#       - The position can "accommodate" a 6 unit wide paddle
-#	- x is between 4 and 59, inclusive
 draw_paddle:
 	#PROLOGUE
 	addi $sp, $sp, -4
 	sw $ra, 0($sp)
+	
+	la $a0, PADDLE
+	lw $a0, 0($a0)
 	
 	li $a1, 55	# set y to 55
 	jal get_location_address	# returns loc_address in $v0
@@ -361,11 +358,57 @@ draw_ball:
 	jr $ra
 game_loop:
 	# 1a. Check if key has been pressed
+	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    	lw $t8, 0($t0)                  # Load first word from keyboard
+    	beq $t8, 1, keyboard_input      # If first word 1, key is pressed
+    	b game_loop
     # 1b. Check which key has been pressed
+keyboard_input:                     # A key is pressed
+    	lw $a0, 4($t0)                  # Load second word from keyboard
+    	beq $a0, 0x71, respond_to_Q     # Check if an action key was pressed
+    	beq $a0, 0x61, respond_to_A
+	beq $a0, 0x64, respond_to_D
+	
+    	li $v0, 1                       # ask system to print $a0
+    	syscall
+
+    b main
+
+respond_to_Q:
+	li $v0, 10                      # Quit gracefully
+	syscall
     # 2a. Check for collisions
 	# 2b. Update locations (paddle, ball)
+respond_to_A:
+	la $t0, PADDLE		# update paddle coord
+	lw $t1, 0($t0)
+	#TODO case where paddle is at edge of screen
+	subi $t1, $t1, 1	# shift paddle 1 unit left	
+	sw $t1, 0($t0)
+	
+	j draw_screen
+	
+respond_to_D:
+	la $t0, PADDLE		# update paddle coord
+	lw $t1, 0($t0)
+	#TODO case where paddle is at edge of screen
+	addi $t1, $t1, 1	# shift paddle 1 unit right	
+	sw $t1, 0($t0)
+	
+	j draw_screen
+	
 	# 3. Draw the screen
+draw_screen:
+	jal draw_walls
+    	jal draw_bricks
+    	jal draw_paddle
+    	jal draw_ball
+    	
 	# 4. Sleep
+	li $v0, 32
+	li $a0, 1000
+	
+	
 
     #5. Go back to 1
     b game_loop
