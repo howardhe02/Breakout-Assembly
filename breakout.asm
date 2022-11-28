@@ -90,9 +90,11 @@ main:
     j game_loop
     
     
-
-
-
+# the ball went out of bounds and the game is over   
+game_over:
+	li $v0, 10                      # Quit gracefully
+	syscall
+	
 
 # get_location_address(x, y) -> address
 #   Return the address of the unit on the display at location (x,y)
@@ -539,6 +541,7 @@ detect_collision:
 	ble $t0, 3, check_walls		# possible collision with left wall
 	bge $t0, 60, check_walls	# possibile collision with right wall
 	beq $t1, 55, paddle_collision	# possible collision with paddle
+	bge $s1, 63, game_over		# ball out of bounds
 	ble $t1, 10, check_walls	# possible collision with top wall
 	bge $t1, 25, check_walls  	# possible collision with something other than bricks
 
@@ -694,7 +697,7 @@ detect_collision:
 	sw $s2, 8($t0) 			# update x direction
 	sw $s3, 12($t0) 		# update y direction
 	b detect_collision_epi
-	
+		
 	
 	paddle_collision:
 	add $t0, $s0, $s2 # x_next
