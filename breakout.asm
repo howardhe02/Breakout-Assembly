@@ -68,7 +68,7 @@ main:
     # Initialize the game
     
     la $t0, PADDLE
-    addi $t1, $0, 29
+    addi $t1, $0, 30
     sw, $t1, 0($t0)
 
     
@@ -450,7 +450,7 @@ erase_paddle:
 	addi $a1, $a1, 32	
 
 draw_paddle_cont:	
-	li $a2, 6	# paddle 6 units wide
+	li $a2, 8	# paddle 8 units wide
 	
 	jal draw_line
 	
@@ -707,7 +707,7 @@ detect_collision:
 	lw $t2, 0($t2)		# $t2 = leftmost x value of paddle
 	addi $t2, $t2, -1	# $t2 = $t2 - 1
 	sgt $t1, $t0, $t2
-	addi $t2, $t2, 8	# t2 = rightmost x vlaue of paddle + 1
+	addi $t2, $t2, 10	# t2 = rightmost x vlaue of paddle + 1
       	slt $t4, $t0, $t2	
       	add $t4, $t4, $t1
       	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
@@ -744,7 +744,7 @@ respond_to_A:
 	lw $t1, 0($t0)
 	#TODO case where paddle is at edge of screen
 	beq $t1, 4, paddle_max_left
-	subi $t1, $t1, 1	# shift paddle 1 unit left	
+	subi $t1, $t1, 2	# shift paddle 2 units left	
 	sw $t1, 0($t0)
 
 paddle_max_left:
@@ -757,8 +757,8 @@ respond_to_D:
 	la $t0, PADDLE		# update paddle coord
 	lw $t1, 0($t0)
 	
-	beq $t1, 54, paddle_max_right
-	addi $t1, $t1, 1	# shift paddle 1 unit right	
+	beq $t1, 52, paddle_max_right
+	addi $t1, $t1, 2	# shift paddle 2 units right	
 	sw $t1, 0($t0)
 paddle_max_right:
 	
