@@ -682,7 +682,6 @@ detect_collision:
 	add $t0, $s1, $s3 		# y + y direction
 	bge $t0, 4, wall_collision 	# check y in bounds
 				   	# if y in bounds, branch to wall
-	# TODO implement game-over check before this
 	# invert x direction
 	addi $t2, $s2, 0		# store value of x direction in temp
 	sub $s2, $s2, $t2		# simulate negation by subtracting by itself twice
@@ -711,6 +710,24 @@ detect_collision:
       	slt $t4, $t0, $t2	
       	add $t4, $t4, $t1
       	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
+      	
+      	
+      	add $t0, $s0, $s2 	# x_next
+      	la $t2, PADDLE 		# get address of PADDLE in memory
+	lw $t2, 0($t2)		# $t2 = leftmost x value of paddle
+	sub $t6, $t0, $t2 	# check distance between x_next and start position of paddle
+	ble $t6, 1, paddle_edge_collision
+	bge $t6, 6, paddle_edge_collision
+	# invert y direction
+	addi $t3, $s3, 0	# store value of y direction in temp
+	sub $s3, $s3, $t3	# simulate negation by subtracting by itself twice
+	sub $s3, $s3, $t3
+	la $t0, BALL
+	sw $s3, 12($t0) 	# update y direction
+	b detect_collision_epi
+	
+	
+      	paddle_edge_collision:
       	# invert x and y directions
       	# invert x direction
 	addi $t2, $s2, 0	# store value of x direction in temp
