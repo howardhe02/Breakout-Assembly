@@ -536,10 +536,12 @@ detect_collision:
 	
 	add $t0, $s0, $s2 # x_next
 	add $t1, $s1, $s3 # y_next
-	ble $t0, 3, check_walls
-	bge $t0, 60, check_walls
-	ble $t1, 10, check_walls
-	bge $t1, 25, check_walls
+	ble $t0, 3, check_walls		# possible collision with left wall
+	bge $t0, 60, check_walls	# possibile collision with right wall
+	beq $t1, 55, paddle_collision	# possible collision with paddle
+	ble $t1, 10, check_walls	# possible collision with top wall
+	bge $t1, 25, check_walls  	# possible collision with something other than bricks
+
 	
 	# check if x_next and y_next are within brick bounds
 	# ble $t1, 10, detect_collision_epi
@@ -549,6 +551,7 @@ detect_collision:
 	# x_next is between 4 and 59 inclusive and y_next is between 11 and 22 inclusive
 	# check for brick collision (3 conditions)
 		# check if ball next position is occupied by a brick using get_brick_address
+		brick_collision_1:
 		# condition 1: hit top/bottom of brick -> delete and invert y direction
 			# moving vertically results in a collision
 			addi $a0, $s0, 0 	# load x
@@ -561,17 +564,87 @@ detect_collision:
 			addi $t0, $v0, 0	# memory location of brick in BRICK_ARRAY
 			lw $v0, 0($v0)		# colour value of the brick
 			# if colour at this location isn't 0x000000, erase brick and invert y
-			beq $v0, 0, check_walls	# no brick present
+			beq $v0, 0, brick_collision_2# no brick present
+			la $t1, COLOURS		# get memory location of COLOURS
+			lw $t1, 32($t1)		# value of colour black
+			sw $t1, 0($t0)		# set the BRICK colour to black
 			jal get_location_address
 			addi $a0, $v0, 0
-			jal erase_brick
+			jal erase_brick 	# erase the brick with the collision
+	
+			# invert y direction
+			addi $t3, $s3, 0	# store value of y direction in temp
+			sub $s3, $s3, $t3	# simulate negation by subtracting by itself twice
+			sub $s3, $s3, $t3
+			la $t0, BALL
+			sw $s3, 12($t0) 	# update y direction
 			b detect_collision_epi
 			
-		
+		brick_collision_2:
 		# condition 2: hit side of brick -> delete and invert x direction
 			# moving horizontally results in a collision
+			addi $a1, $s1, 0 	# load y
+			add $t1, $s0, $s2 	# x_next
+			addi $a0, $t1, 0	# load x_next
+			jal get_brick_address
+			lw $a1, 0($sp)		# starting y of brick in units
+			lw $a0, 4($sp)		# starting x of brick in units
+			addi $sp, $sp, 8
+			addi $t0, $v0, 0	# memory location of brick in BRICK_ARRAY
+			lw $v0, 0($v0)		# colour value of the brick
+			# if colour at this location isn't 0x000000, erase brick and invert y
+			beq $v0, 0, brick_collision_3	# no brick present
+			la $t1, COLOURS		# get memory location of COLOURS
+			lw $t1, 32($t1)		# value of colour black
+			sw $t1, 0($t0)		# set the BRICK colour to black
+			jal get_location_address
+			addi $a0, $v0, 0
+			jal erase_brick 	# erase the brick with the collision
+			# invert x direction
+			addi $t2, $s2, 0	# store value of x direction in temp
+			sub $s2, $s2, $t2		# simulate negation by subtracting by itself twice
+			sub $s2, $s2, $t2	
+	
+			la $t0, BALL
+			sw $s2, 8($t0) 		# update x direction
+			b detect_collision_epi
+			
+		brick_collision_3:
 		# condition 3: hit corner of brick -> delete and invert both directions
 			# moving in both axes results in a collision
+			add $t0, $s0, $s2	# x_next
+			addi $a0, $t0, 0 	# load x_next
+			add $t1, $s1, $s3 	# y_next
+			addi $a1, $t1, 0	# load y_next
+			jal get_brick_address
+			lw $a1, 0($sp)		# starting y of brick in units
+			lw $a0, 4($sp)		# starting x of brick in units
+			addi $sp, $sp, 8
+			addi $t0, $v0, 0	# memory location of brick in BRICK_ARRAY
+			lw $v0, 0($v0)		# colour value of the brick
+			# if colour at this location isn't 0x000000, erase brick and invert y
+			beq $v0, 0, check_walls	# no brick present
+			la $t1, COLOURS		# get memory location of COLOURS
+			lw $t1, 32($t1)		# value of colour black
+			sw $t1, 0($t0)		# set the BRICK colour to black
+			jal get_location_address
+			addi $a0, $v0, 0
+			jal erase_brick 	# erase the brick with the collision
+	
+			# invert x direction
+			addi $t2, $s2, 0	# store value of x direction in temp
+			sub $s2, $s2, $t2	# simulate negation by subtracting by itself twice
+			sub $s2, $s2, $t2	
+	
+			# invert y direction
+			addi $t3, $s3, 0	# store value of y direction in temp
+			sub $s3, $s3, $t3	# simulate negation by subtracting by itself twice
+			sub $s3, $s3, $t3
+	
+			la $t0, BALL
+			sw $s2, 8($t0) 		# update x direction
+			sw $s3, 12($t0) 	# update y direction
+			b detect_collision_epi
 		
 	check_walls:	
 	add $t0, $s0, $s2 		# check x left out of bounds
@@ -624,9 +697,31 @@ detect_collision:
 	
 	
 	paddle_collision:
-      
-	          
-	# 2b. Update locations (paddle, ball)
+	add $t0, $s0, $s2 # x_next
+	add $t1, $s1, $s3 # y_next
+	# get paddle position (leftmost unit)
+	la $t2, PADDLE 		# get address of PADDLE in memory
+	lw $t2, 0($t2)		# $t2 = leftmost x value of paddle
+	addi $t2, $t2, -1	# $t2 = $t2 - 1
+	sgt $t1, $t0, $t2
+	addi $t2, $t2, 8	# t2 = rightmost x vlaue of paddle + 1
+      	slt $t4, $t0, $t2	
+      	add $t4, $t4, $t1
+      	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
+      	# invert x and y directions
+      	# invert x direction
+	addi $t2, $s2, 0	# store value of x direction in temp
+	sub $s2, $s2, $t2	# simulate negation by subtracting by itself twice
+	sub $s2, $s2, $t2	
+	
+	# invert y direction
+	addi $t3, $s3, 0	# store value of y direction in temp
+	sub $s3, $s3, $t3	# simulate negation by subtracting by itself twice
+	sub $s3, $s3, $t3
+	
+	la $t0, BALL
+	sw $s2, 8($t0) 		# update x direction
+	sw $s3, 12($t0) 	# update y direction
 	
 	# EPILOGUE
 	detect_collision_epi:
