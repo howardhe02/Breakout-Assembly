@@ -125,34 +125,44 @@ get_location_address:
 # arr_x = pos_x // 4 - 1
 # arr_y = (pos_x - 9) // 2	
 # the brick address is going to be the ith element in BRICK_ARRAY 
-# where i = arr_x + arr_y * 64
+# where i = arr_x + arr_y * 56
 # e.g. the first brick in the second row (from the top) will have x_arr = 0, y_arr = 1,
-# so it will be the 64th element in BRICK_ARRAY
+# so it will be the 14th element in BRICK_ARRAY (14th element x 4 = 56)
 get_brick_address:
-	# BODY
-	srl $a0, $a0, 2 	# floor divide x by 4
-	subi $a0, $a0, 1	# subtract x by 1
-	addi $t0, $a0, 1 	# add 1
-	sll $t0, $t0, 2  	# mult 2 -> the x starting position of brick
+	# BODY	
+	subi $a0, $a0, 4	# subtract x by 4 (to get proper index when floor dividing)
+	div $a0, $a0, 4		# floor divide x by 4
+	addi $t0, $a0, 0 	# store $a0 in $t0 ($a0 is the index for brick array)
+	
+	sll $t0, $t0, 2		# multiply by 4 -> the x starting position of brick
+	
+	
+	addi $t0, $t0, 4		# add 4 to account for offset 
+	
 	addi $sp, $sp,  -4	# store starting x positions on stack
-	lw $t0, 0($sp)
+	sw $t0, 0($sp)
 	
-	subi $a1, $a1, 1	# subtract y by 1
-	srl $a1, $a1, 1		# floor divide y by 2
+	subi $a1, $a1, 11	# subtract y by 11 (to get proper index when floor dividing)
+	div $a1, $a1, 2		# floor divide y by 2
+	addi $t1, $a1, 0 	# store $a1 in $t1 ($a1 is the index for brick array)
 	
-	addi $t1, $a1, 0	# invert above steps
-	sll $t1, $t1, 2
-	addi $t1, $t1, 1 
-	addi $sp, $sp, -4   		# store starting y position on stack
-	lw $t0, 0($sp)
-	sll $a1, $a1, 6 	# multiply by 64
+	sll $t1, $t1, 1		# multiply by 2 -> the y starting position of brick
+	
+	
+	addi $t1, $t1, 11		# add 11 to account for offset
+	
+	addi $sp, $sp, -4   	# store starting y position on stack
+	sw $t1, 0($sp)
+	
+	sll $a0, $a0, 2		# multiply x index by 4 to represent index in terms of words 
+	li  $t1, 56		# multiply by 56
+	mult $a1, $t1
+	mflo $a1
 	
 	add $t0, $a0, $a1 	# the index of the brick in BRICK_ARRAY
-	sll $t0, $t0, 2		# represent the index in terms of words (multiply by 4)
-	
 	
 	la $v0, BRICK_ARRAY
-	addi $v0, $t0, 0	# return the position of the brick in BRICK_ARRAY
+	add $v0, $v0, $t0	# return the position of the brick in BRICK_ARRAY
 	
 	# EPILOGUE
 	jr $ra
@@ -177,7 +187,7 @@ erase_brick:
     addi $s0, $a0, 0
     la $s1, COLOURS
     lw $s1, 0($s1)
-    addi $s2, $s2, 2
+    li $s2, 2
     
 
     # Iterate 2 ($a2) times, drawing each line
@@ -188,7 +198,10 @@ erase_brick_loop:
 
         # call draw_line
         addi $a0, $s0, 0 # start
-        addi $a1, $s1, 0 # colour_address
+        
+        la $a1, COLOURS
+        add $a1, $a1, 32 #colour_address
+        
         li $a2, 4	  # width = 4
         jal draw_line
 
@@ -525,10 +538,15 @@ detect_collision:
 	add $t1, $s1, $s3 # y_next
 	ble $t0, 3, check_walls
 	bge $t0, 60, check_walls
-	ble $t0, 8, check_walls
-	bge $t0, 23, check_walls
+	ble $t1, 10, check_walls
+	bge $t1, 25, check_walls
 	
-	# x_next is between 4 and 59 inclusive and y_next is between 9 and 22 inclusive
+	# check if x_next and y_next are within brick bounds
+	# ble $t1, 10, detect_collision_epi
+	# bge $t1, 23, detect_collision_epi
+	
+	
+	# x_next is between 4 and 59 inclusive and y_next is between 11 and 22 inclusive
 	# check for brick collision (3 conditions)
 		# check if ball next position is occupied by a brick using get_brick_address
 		# condition 1: hit top/bottom of brick -> delete and invert y direction
@@ -537,9 +555,9 @@ detect_collision:
 			add $t1, $s1, $s3 	# y_next
 			addi $a1, $t1, 0	# load y_next
 			jal get_brick_address
+			lw $a1, 0($sp)		# starting y of brick in units
+			lw $a0, 4($sp)		# starting x of brick in units
 			addi $sp, $sp, 8
-			lw $a0, 0($sp)		# starting x of brick in units
-			lw $a1, 4($sp)		# starting y of brick in units
 			addi $t0, $v0, 0	# memory location of brick in BRICK_ARRAY
 			lw $v0, 0($v0)		# colour value of the brick
 			# if colour at this location isn't 0x000000, erase brick and invert y
