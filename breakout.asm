@@ -515,7 +515,7 @@ keyboard_input:                     # A key is pressed
     	li $v0, 1                       # ask system to print $a0
     	syscall
 
-    	b refresh_ball
+    	b detect_collision
 
 respond_to_Q:
 	li $v0, 10                      # Quit gracefully
@@ -770,7 +770,7 @@ refresh_paddle:
 	li $a0, 0
 	jal draw_paddle
 	
-	b refresh_ball
+	b detect_collision
 
 refresh_ball:
 	
