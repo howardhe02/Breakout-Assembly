@@ -803,7 +803,7 @@ refresh_ball:
 	# 4. Sleep
 sleep:
 	li $v0, 32
-	li $a0, 25
+	li $a0, 1
 	syscall
 	
     	#5. Go back to 1
