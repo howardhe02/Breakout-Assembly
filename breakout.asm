@@ -1,6 +1,8 @@
 ################ CSC258H1F Fall 2022 Assembly Final Project ##################
 # This file contains our implementation of Breakout.
 #
+# Assembled in EMARS 4.7
+#
 # Student 1: Brian Chen, 1008157879
 # Student 2: John Fitzgerald, 1008155513
 ######################## Bitmap Display Configuration ########################
@@ -57,6 +59,9 @@ BRICK_ARRAY:
 	.word 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a
 	.word 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6
 	.word 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db
+
+SCORE:
+	.word 0		#store current score, initialized to 0
 ##############################################################################
 # Code
 ##############################################################################
@@ -92,6 +97,7 @@ main:
     
 # the ball went out of bounds and the game is over   
 game_over:
+	
 	li $v0, 10                      # Quit gracefully
 	syscall
 	
@@ -175,14 +181,16 @@ get_brick_address:
 #   Preconditions:
 #       - The start address can "accommodate" a brick of size 4 x 2
 erase_brick:
-	# PROLOGUE
-	addi $sp, $sp, -20
+    
+    # PROLOGUE
+    addi $sp, $sp, -20
     sw $s3, 16($sp)
     sw $s2, 12($sp)
     sw $s1, 8($sp)
     sw $s0, 4($sp)
-	sw $ra, 0($sp)
-
+    sw $ra, 0($sp)
+	
+    
     # BODY
     # Arguments are not preserved across function calls, so we
     # save them before starting the loop
@@ -212,14 +220,23 @@ erase_brick_loop:
     addi $s3, $s3, 1            # i = i + 1
     b erase_brick_loop
 
+
+				
+    
+    
+    
 erase_brick_epi:
+    
     # EPILOGUE
-	lw		$ra, 0($sp)
+    
+    lw	    $ra, 0($sp)
     lw      $s0, 4($sp)
     lw      $s1, 8($sp)
     lw      $s2, 12($sp)
     lw      $s3, 16($sp)
-	addi	$sp, $sp, 20
+    addi    $sp, $sp, 20
+    
+    
 
     jr $ra
 
@@ -499,6 +516,11 @@ draw_ball_cont:
 	
 	jr $ra
 game_loop:
+	la $t0, SCORE			# check if all bricks have been broken, if so, end game
+	lw $t1, 0($t0)
+	beq $t1, 98, game_over
+	
+	
 	# 1a. Check if key has been pressed
 	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
     	lw $t8, 0($t0)                  # Load first word from keyboard
@@ -574,6 +596,9 @@ detect_collision:
 			jal get_location_address
 			addi $a0, $v0, 0
 			jal erase_brick 	# erase the brick with the collision
+			
+			# increment score
+    			jal increment_score
 	
 			# invert y direction
 			addi $t3, $s3, 0	# store value of y direction in temp
@@ -603,6 +628,10 @@ detect_collision:
 			jal get_location_address
 			addi $a0, $v0, 0
 			jal erase_brick 	# erase the brick with the collision
+			
+			# increment score
+    			jal increment_score
+    			
 			# invert x direction
 			addi $t2, $s2, 0	# store value of x direction in temp
 			sub $s2, $s2, $t2		# simulate negation by subtracting by itself twice
@@ -633,6 +662,9 @@ detect_collision:
 			jal get_location_address
 			addi $a0, $v0, 0
 			jal erase_brick 	# erase the brick with the collision
+			
+			# increment score
+    			jal increment_score
 	
 			# invert x direction
 			addi $t2, $s2, 0	# store value of x direction in temp
@@ -751,6 +783,20 @@ detect_collision:
 		sw $s3, 12($sp)
 		addi $sp, $sp, 16
 		b refresh_ball
+
+# increment_score()
+#	
+#	increment score by 1 on brick collision
+increment_score:
+	
+	la $t0, SCORE		
+	lw $t1, 0($t0)		# get current score
+	addi $t1, $t1, 1	# increment score
+	sw $t1, 0($t0)		# store score
+	
+	jr $ra			# return
+	
+
 	
 	
 respond_to_A:
@@ -791,7 +837,7 @@ refresh_paddle:
 
 refresh_ball:
 	
-	li $a0, 1
+	li $a0, 1		# erase ball
 	jal draw_ball
 	
 	la $t0, BALL
@@ -808,9 +854,14 @@ refresh_ball:
 	li $a0, 0
 	jal draw_ball
 	
-	li $v0, 32
-	li $a0, 25
-	syscall
+	#li $v0, 32
+	#li $a0, 25
+	#syscall
+	
+	# tell the display to update
+	lw   $t8, ADDR_DSPL
+	li   $t9, 1
+	sb   $t9, 0($t8)
 	
 	b sleep
 	
@@ -820,8 +871,8 @@ refresh_ball:
 	# 4. Sleep
 sleep:
 	li $v0, 32
-	li $a0, 1
+	li $a0, 30
 	syscall
 	
-    	#5. Go back to 1
+	#5. Go back to 1
     	b game_loop
