@@ -858,10 +858,12 @@ refresh_ball:
 	#li $a0, 25
 	#syscall
 	
-	# tell the display to update
+	
+	# tell display to update
 	lw   $t8, ADDR_DSPL
-	li   $t9, 1
-	sb   $t9, 0($t8)
+	la $t9, COLOURS
+	lw $t9, 36($t9)
+	sw $t9, 0($t8)
 	
 	b sleep
 	
