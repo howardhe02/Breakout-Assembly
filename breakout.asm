@@ -179,7 +179,7 @@ get_brick_address:
 #   Erase a brick on the display starting from the start address
 #
 #   Preconditions:
-#       - The start address can "accommodate" a brick of size 4 x 2
+#       - The start address can "accommodate" a brick of size 2 x 4
 erase_brick:
     
     # PROLOGUE
@@ -426,7 +426,7 @@ draw_brick_loop:
 	beq $t4, $0, draw_bricks_next_row
 	j draw_brick_loop
 draw_bricks_next_row:
-	addi $s2, $s2, 288	# go to next row (+ 2 lines)	TODO FIGURE OUT WHY 
+	addi $s2, $s2, 288	# go to next row (+ 2 lines)	
 	j draw_brick_loop
 		
 draw_bricks_epi:
@@ -573,7 +573,7 @@ detect_collision:
 	# bge $t1, 23, detect_collision_epi
 	
 	
-	# x_next is between 4 and 59 inclusive and y_next is between 11 and 22 inclusive
+	# x_next is between 4 and 59 inclusive and y_next is between 11 and 24 inclusive
 	# check for brick collision (3 conditions)
 		# check if ball next position is occupied by a brick using get_brick_address
 		brick_collision_1:
@@ -805,7 +805,7 @@ respond_to_A:
 	
 	la $t0, PADDLE		# update paddle coord
 	lw $t1, 0($t0)
-	#TODO case where paddle is at edge of screen
+	
 	beq $t1, 4, paddle_max_left
 	subi $t1, $t1, 2	# shift paddle 2 units left	
 	sw $t1, 0($t0)
