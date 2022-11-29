@@ -738,7 +738,7 @@ detect_collision:
 	lw $t2, 0($t2)		# $t2 = leftmost x value of paddle
 	addi $t2, $t2, -1	# $t2 = $t2 - 1
 	sgt $t1, $t0, $t2
-	addi $t2, $t2, 10	# t2 = rightmost x vlaue of paddle + 1
+	addi $t2, $t2, 10	# t2 = rightmost x value of paddle + 1
       	slt $t4, $t0, $t2	
       	add $t4, $t4, $t1
       	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
