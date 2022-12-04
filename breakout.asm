@@ -62,6 +62,9 @@ BRICK_ARRAY:
 
 SCORE:
 	.word 0		#store current score, initialized to 0
+	
+LIVES:
+	.word 3		# keep track of the players lives, intialized to 3
 ##############################################################################
 # Code
 ##############################################################################
@@ -76,7 +79,7 @@ main:
     addi $t1, $0, 30
     sw, $t1, 0($t0)
 
-    
+    # initialize ball with starting position and direction
     la $t0, BALL
     addi $t1, $0, 31
     sw, $t1, 0($t0)
@@ -94,13 +97,43 @@ main:
     
     j game_loop
     
-    
+
+# subtract 1 life, if the player has 1 or more lives, let them play again
+check_lives:
+	la $t0, LIVES			# get address for lives
+	lw $t1, 0($t0)			# store the lives in $t1
+	addi $t1, $t1, -1		# subtract lives by 1 and store in $t1
+	sw $t1, 0($t0) 			# store the new lives count in memory
+	ble $t1, 0 game_over		# if there are 0 lives, the game is over
+	# intialize ball again
+	la $t0, BALL
+    	addi $t1, $0, 31
+   	sw, $t1, 0($t0)
+    	addi $t1, $0, 54
+   	sw $t1, 4($t0)
+  	addi $t1, $0, -1
+   	sw, $t1, 8($t0)
+   	addi $t1, $0, -1
+   	sw $t1, 12($t0)
+   	
+   	j game_loop
+
+
 # the ball went out of bounds and the game is over   
 game_over:
+	# TODO: draw game over screen
 	
-	li $v0, 10                      # Quit gracefully
+	# check for keyboard input 'r' to restart or 'q' to quit
+	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+    	lw $t8, 0($t0)                  # Load first word from keyboard
+    	beq $t8, 1, keyboard_input      # If first word 1, key is pressed
+    	
+    	# sleep
+    	li $v0, 32
+	li $a0, 30
 	syscall
-	
+	# wait for key press again
+	b game_over
 
 # get_location_address(x, y) -> address
 #   Return the address of the unit on the display at location (x,y)
@@ -533,6 +566,7 @@ keyboard_input:                     # A key is pressed
     	beq $a0, 0x71, respond_to_Q     # Check if an action key was pressed
     	beq $a0, 0x61, respond_to_A
 	beq $a0, 0x64, respond_to_D
+	beq $a0, 0x72, respond_to_R
 	
     	li $v0, 1                       # ask system to print $a0
     	syscall
@@ -542,6 +576,11 @@ keyboard_input:                     # A key is pressed
 respond_to_Q:
 	li $v0, 10                      # Quit gracefully
 	syscall
+respond_to_R:
+	# TODO: reset brick array to original colours
+	# call main again and restart game
+	j main
+	
     # 2a. Check for collisions
 detect_collision:
 	#PROLOGUE
@@ -563,7 +602,7 @@ detect_collision:
 	ble $t0, 3, check_walls		# possible collision with left wall
 	bge $t0, 60, check_walls	# possibile collision with right wall
 	beq $t1, 55, paddle_collision	# possible collision with paddle
-	bge $s1, 63, game_over		# ball out of bounds
+	bge $s1, 63, check_lives	# ball out of bounds
 	ble $t1, 10, check_walls	# possible collision with top wall
 	bge $t1, 25, check_walls  	# possible collision with something other than bricks
 
@@ -795,8 +834,6 @@ increment_score:
 	sw $t1, 0($t0)		# store score
 	
 	jr $ra			# return
-	
-
 	
 	
 respond_to_A:
