@@ -52,14 +52,13 @@ PADDLE:
 	.space 4	#reserve space for x coord of paddle
 
 BRICK_ARRAY:
-	.word 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f, 0xe6261f
-	.word 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532, 0xeb7532
-	.word 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038, 0xf7d038,0xf7d038
-	.word 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048, 0xa3e048
-	.word 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a, 0x49da9a
-	.word 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6, 0x34bbe6
-	.word 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db, 0x4355db
-
+	.space 56
+	.space 56
+	.space 56
+	.space 56
+	.space 56
+	.space 56
+	.space 56
 SCORE:
 	.word 0		#store current score, initialized to 0
 	
@@ -90,6 +89,7 @@ main:
     addi $t1, $0, -1
     sw $t1, 12($t0)
     
+    jal populate_bricks
     jal draw_walls
     jal draw_bricks
     jal draw_paddle
@@ -130,7 +130,7 @@ game_over:
     	
     	# sleep
     	li $v0, 32
-	li $a0, 30
+	li $a0, 50
 	syscall
 	# wait for key press again
 	b game_over
@@ -208,6 +208,71 @@ get_brick_address:
 	# EPILOGUE
 	jr $ra
 
+
+
+# populate_bricks() -> void
+# 	Populate the brick array with the starting colours
+populate_bricks:
+	# PROLOGUE
+   	addi $sp, $sp, -20
+    	sw $s3, 16($sp)
+   	sw $s2, 12($sp)
+    	sw $s1, 8($sp)
+   	sw $s0, 4($sp)
+    	sw $ra, 0($sp)
+
+	la $s0, COLOURS		# load location for colours
+	la $s1, BRICK_ARRAY    # load location for BRICK_ARRAY
+	li $s2, 7
+# Iterate 7 ($s2) times
+    	li $s3, 0                   # i = 0
+populate_bricks_loop:
+	slt $t2, $s3, $s2           # i < end ?
+    	beq $t2, $0, populate_bricks_epi # if not, then done
+		
+		lw $a0, 0($s0)
+		addi $a1, $s1, 0
+        	jal populate_bricks_row
+        	addi $s0, $s0, 4
+        	addi $s1, $s1, 56
+
+    addi $s3, $s3, 1            # i = i + 1
+    j populate_bricks_loop	
+    
+populate_bricks_epi:
+    
+   	 # EPILOGUE
+    
+   	lw $ra, 0($sp)
+   	lw $s0, 4($sp)
+   	lw $s1, 8($sp)
+   	lw $s2, 12($sp)
+    	lw $s3, 16($sp)
+   	addi $sp, $sp, 20
+    
+   	jr $ra   
+    
+# populate_bricks_row(COLOUR VALUE, START_ADDRESS) -> void
+# 	Called by populate_bricks to do one row at a time
+populate_bricks_row:
+	li $t0, 0 		# i = 0
+	li $t7, 14		# end = 14
+	
+populate_bricks_row_loop:
+    slt $t2, $t0, $t7           # i < end ?
+    beq $t2, $0, populate_bricks_row_epi # if not, then done
+
+        sw $a0, 0($a1)		# store the colour
+        addi $a1, $a1, 4		# increment address by 4 bytes
+
+    addi $t0, $t0, 1            # i = i + 1
+    j populate_bricks_row_loop	
+	 
+populate_bricks_row_epi:
+	jr $ra    
+
+
+
 # erase_brick(start) -> void
 #   Erase a brick on the display starting from the start address
 #
@@ -233,7 +298,7 @@ erase_brick:
     li $s2, 2
     
 
-    # Iterate 2 ($a2) times, drawing each line
+    # Iterate 2 ($s2) times, drawing each line
     li $s3, 0                   # i = 0
 erase_brick_loop:
     slt $t0, $s3, $s2           # i < size ?
@@ -577,7 +642,29 @@ respond_to_Q:
 	li $v0, 10                      # Quit gracefully
 	syscall
 respond_to_R:
-	# TODO: reset brick array to original colours
+	# reset lives
+	la $t0, LIVES
+	li $t1, 3
+	sw $t1, 0($t0)
+
+	# reset paddle line
+	li $a0, 4
+	li $a1, 55
+	jal get_location_address
+	addi $a0, $v0, 0
+	la $a1, COLOURS
+	addi $a1, $a1, 32
+	li $a2, 56
+	jal draw_line
+	# reset previous balls
+	li $a0, 4
+	li $a1, 63
+	jal get_location_address
+	addi $a0, $v0, 0
+	la $a1, COLOURS
+	addi $a1, $a1, 32
+	li $a2, 56
+	jal draw_line
 	# call main again and restart game
 	j main
 	
