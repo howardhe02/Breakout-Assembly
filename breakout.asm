@@ -36,6 +36,8 @@ ADDR_DSPL:
 # The address of the keyboard. Don't forget to connect it!
 ADDR_KBRD:
     .word 0xffff0000
+START_TIME:
+    .space 8
 
 ##############################################################################
 # Mutable Data
@@ -77,7 +79,14 @@ main:
     la $t0, PADDLE
     addi $t1, $0, 30
     sw, $t1, 0($t0)
-
+	
+    # Load current time into constant
+    
+    la $t0, START_TIME
+    li $v0, 30
+    syscall
+    sw, $a0, 0($t0)
+    	
     # initialize ball with starting position and direction
     la $t0, BALL
     addi $t1, $0, 31
@@ -104,7 +113,7 @@ check_lives:
 	lw $t1, 0($t0)			# store the lives in $t1
 	addi $t1, $t1, -1		# subtract lives by 1 and store in $t1
 	sw $t1, 0($t0) 			# store the new lives count in memory
-	ble $t1, 0 game_over		# if there are 0 lives, the game is over
+	ble $t1, 0, game_over		# if there are 0 lives, the game is over
 	# intialize ball again
 	la $t0, BALL
     	addi $t1, $0, 31
@@ -134,6 +143,11 @@ game_over:
 	syscall
 	# wait for key press again
 	b game_over
+
+game_over2:
+
+li $v0, 10                      # Quit gracefully
+	syscall
 
 # get_location_address(x, y) -> address
 #   Return the address of the unit on the display at location (x,y)
@@ -614,10 +628,17 @@ draw_ball_cont:
 	
 	jr $ra
 game_loop:
+	li $v0, 30			# load current time
+	syscall
+	la $t3, START_TIME		# check if current time has reached start time +10000 ms
+	lw $t4, 0($t3)			
+	addi $t4, $t4, 10000
+	bgt $a0, $t4, game_over2		# if so, end game
+	
 	la $t0, SCORE			# check if all bricks have been broken, if so, end game
 	lw $t1, 0($t0)
 	beq $t1, 98, game_over
-	
+					
 	
 	# 1a. Check if key has been pressed
 	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
@@ -625,6 +646,19 @@ game_loop:
     	beq $t8, 1, keyboard_input      # If first word 1, key is pressed
     	
     	b detect_collision
+
+pause_loop:
+	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
+	lw $t8, 0($t0)                  # Load first word from keyboard
+    	beq $t8, 1, check_resume	# If first word 1, key is pressed
+    	
+    	b pause_loop
+
+check_resume:				# A key is pressed
+	lw $a0, 4($t0)                  # Load second word from keyboard COMMENT THIS OUT TO MOVE ONE FRAME AT A TIME FOR DEBUG
+	beq $a0, 0x70, detect_collision	# if P is pressed, resume game
+	b pause_loop			# else, go back to pause loop
+
     # 1b. Check which key has been pressed
 keyboard_input:                     # A key is pressed
     	lw $a0, 4($t0)                  # Load second word from keyboard
@@ -632,6 +666,7 @@ keyboard_input:                     # A key is pressed
     	beq $a0, 0x61, respond_to_A
 	beq $a0, 0x64, respond_to_D
 	beq $a0, 0x72, respond_to_R
+	beq $a0, 0x70, respond_to_P
 	
     	li $v0, 1                       # ask system to print $a0
     	syscall
@@ -667,6 +702,10 @@ respond_to_R:
 	jal draw_line
 	# call main again and restart game
 	j main
+
+respond_to_P:
+	b pause_loop 			# If p is pressed, go to paused loop of game
+	
 	
     # 2a. Check for collisions
 detect_collision:
@@ -868,6 +907,15 @@ detect_collision:
       	slt $t4, $t0, $t2	
       	add $t4, $t4, $t1
       	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
+      	
+      	li $v0, 33					# play sound
+      	li $a0, 32
+      	li $a1, 10
+      	li $a2, 5
+      	li $a3, 100
+      	syscall
+      	
+      	
       	
       	
       	add $t0, $s0, $s2 	# x_next
