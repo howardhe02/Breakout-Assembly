@@ -29,6 +29,15 @@ COLOURS:
 	.word 0xfffdd0	#cream (36)
 	.word 0x2a9d8f	#jungle (40)
 	
+LEVEL_TWO:
+	.word 0xe6261f	#red (0)
+	.word 0x000000	#black (4)
+	.word 0xf7d038	#yellow (8)
+	.word 0x000000	#black (12)
+	.word 0x49da9a	#jade (16)
+	.word 0x000000	#black (20)
+	.word 0x4355db	#blue (24)
+	
 ##############################################################################
 # The address of the bitmap display. Don't forget to connect it!
 ADDR_DSPL:
@@ -98,6 +107,7 @@ main:
     addi $t1, $0, -1
     sw $t1, 12($t0)
     
+    la $a0, COLOURS
     jal populate_bricks
     jal draw_walls
     jal draw_bricks
@@ -130,7 +140,7 @@ check_lives:
 
 # the ball went out of bounds and the game is over   
 game_over:
-	# TODO: draw game over screen
+	jal reset_screen
 	
 	# check for keyboard input 'r' to restart or 'q' to quit
 	lw $t0, ADDR_KBRD               # $t0 = base address for keyboard
@@ -224,7 +234,7 @@ get_brick_address:
 
 
 
-# populate_bricks() -> void
+# populate_bricks(COLOUR_ARRAY_ADDRESS) -> void
 # 	Populate the brick array with the starting colours
 populate_bricks:
 	# PROLOGUE
@@ -235,8 +245,8 @@ populate_bricks:
    	sw $s0, 4($sp)
     	sw $ra, 0($sp)
 
-	la $s0, COLOURS		# load location for colours
-	la $s1, BRICK_ARRAY    # load location for BRICK_ARRAY
+	addi $s0, $a0, 0		# load location for colours
+	la $s1, BRICK_ARRAY    		# load location for BRICK_ARRAY
 	li $s2, 7
 # Iterate 7 ($s2) times
     	li $s3, 0                   # i = 0
@@ -284,6 +294,54 @@ populate_bricks_row_loop:
 	 
 populate_bricks_row_epi:
 	jr $ra    
+
+# reset_screen(-> void
+#   Draw the screen with black
+reset_screen:
+	# PROLOGUE
+	addi $sp, $sp, -20
+    	sw $s3, 16($sp)
+    	sw $s2, 12($sp)
+    	sw $s1, 8($sp)
+    	sw $s0, 4($sp)
+	sw $ra, 0($sp)
+
+    # BODY
+    la $s0, ADDR_DSPL
+    lw $s0, 0($s0) 		# initialize the start location 
+    la $s1, COLOURS
+    addi $s1, $s1, 32		# load colour black address
+    li $s2, 64			# size
+
+    # Iterate 64 ($s2) times, drawing each line
+    li $s3, 0                   # i = 0
+reset_screen_loop:
+    slt $t0, $s3, $s2           # i < 64 ?
+    beq $t0, $0, reset_screen_epi# if not, then done
+
+        # call draw_line
+        addi $a0, $s0, 0 	# starting address for draw line
+        addi $a1, $s1, 0
+        addi $a2, $s2, 0
+        jal draw_line
+
+        addi $s0, $s0, 256     # Go to next row
+
+    addi $s3, $s3, 1            # i = i + 1
+    b reset_screen_loop
+
+reset_screen_epi:
+    	# EPILOGUE
+	lw $ra, 0($sp)
+    	lw $s0, 4($sp)
+    	lw $s1, 8($sp)
+    	lw $s2, 12($sp)
+    	lw $s3, 16($sp)
+	addi $sp, $sp, 20
+
+    	jr $ra
+
+
 
 
 
@@ -632,7 +690,7 @@ game_loop:
 	syscall
 	la $t3, START_TIME		# check if current time has reached start time +10000 ms
 	lw $t4, 0($t3)			
-	addi $t4, $t4, 10000
+	addi $t4, $t4, 1000000
 	bgt $a0, $t4, game_over2		# if so, end game
 	
 	la $t0, SCORE			# check if all bricks have been broken, if so, end game
@@ -667,11 +725,54 @@ keyboard_input:                     # A key is pressed
 	beq $a0, 0x64, respond_to_D
 	beq $a0, 0x72, respond_to_R
 	beq $a0, 0x70, respond_to_P
+	beq $a0, 0x32, respond_to_2
 	
     	li $v0, 1                       # ask system to print $a0
     	syscall
 
     	b detect_collision
+
+respond_to_2:
+	jal reset_screen
+	
+	# reset lives (level 2 only gets 1 life)
+	la $t0, LIVES
+	li $t1, 1
+	sw $t1, 0($t0)
+	
+	# Initialize the game
+    
+    	la $t0, PADDLE
+    	addi $t1, $0, 30
+    	sw, $t1, 0($t0)
+	
+    	# Load current time into constant
+    
+    	la $t0, START_TIME
+    	li $v0, 30
+    	syscall
+    	sw, $a0, 0($t0)
+    	
+    	# initialize ball with starting position and direction
+    	la $t0, BALL
+    	addi $t1, $0, 31
+    	sw, $t1, 0($t0)
+    	addi $t1, $0, 54
+    	sw $t1, 4($t0)
+    	addi $t1, $0, -1
+    	sw, $t1, 8($t0)
+    	addi $t1, $0, -1
+    	sw $t1, 12($t0)
+    
+    	la $a0, LEVEL_TWO
+    	jal populate_bricks
+    	jal draw_walls
+    	jal draw_bricks
+    	jal draw_paddle
+    	jal draw_ball
+    
+    	j game_loop
+	
 
 respond_to_Q:
 	li $v0, 10                      # Quit gracefully
@@ -908,12 +1009,14 @@ detect_collision:
       	add $t4, $t4, $t1
       	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
       	
-      	li $v0, 33					# play sound
-      	li $a0, 32
-      	li $a1, 10
-      	li $a2, 5
-      	li $a3, 100
-      	syscall
+      	
+      	# FIX SOUND
+      	#li $v0, 33					# play sound
+      	#li $a0, 32
+      	#li $a1, 10
+      	#li $a2, 5
+      	#li $a3, 100
+      	#syscall
       	
       	
       	
