@@ -643,9 +643,9 @@ draw_ball_cont:
 game_loop:
 	li $v0, 30			# load current time
 	syscall
-	la $t3, START_TIME		# check if current time has reached start time +10000 ms
+	la $t3, START_TIME		# check if current time has reached start time +30000 ms
 	lw $t4, 0($t3)			
-	addi $t4, $t4, 10000
+	addi $t4, $t4, 30000
 	bgt $a0, $t4, time_limit	# if so, end game
 	
 	la $t0, SCORE			# check if all bricks have been broken, if so, end game
