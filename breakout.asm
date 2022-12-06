@@ -154,10 +154,16 @@ game_over:
 	# wait for key press again
 	b game_over
 
-game_over2:
-
-li $v0, 10                      # Quit gracefully
-	syscall
+# time limit reached
+time_limit:
+	
+	la $t0, LIVES			# get address for lives
+	addi $t1, $0, 0			# store 0 in t1
+	sw $t1, 0($t0)			# set lives to 0
+	
+	b detect_collision		# branch to collision detection
+	
+	
 
 # get_location_address(x, y) -> address
 #   Return the address of the unit on the display at location (x,y)
@@ -396,6 +402,13 @@ erase_brick_loop:
     
     
 erase_brick_epi:
+
+    li $v0, 31					# play sound
+    li $a0, 18
+    li $a1, 100
+    li $a2, 15
+    li $a3, 100
+    syscall
     
     # EPILOGUE
     
@@ -688,10 +701,12 @@ draw_ball_cont:
 game_loop:
 	li $v0, 30			# load current time
 	syscall
-	la $t3, START_TIME		# check if current time has reached start time +10000 ms
+	la $t3, START_TIME		# check if current time has reached start time +30000 ms
 	lw $t4, 0($t3)			
-	addi $t4, $t4, 1000000
-	bgt $a0, $t4, game_over2		# if so, end game
+
+	addi $t4, $t4, 30000
+	bgt $a0, $t4, time_limit	# if so, end game
+
 	
 	la $t0, SCORE			# check if all bricks have been broken, if so, end game
 	lw $t1, 0($t0)
@@ -957,6 +972,14 @@ detect_collision:
 	b detect_collision_epi
 	
 	top_wall_collision:
+	
+	li $v0, 31					# play sound
+      	li $a0, 10
+      	li $a1, 100
+      	li $a2, 9
+      	li $a3, 100
+      	syscall
+	
 	# invert y direction
 	addi $t3, $s3, 0		# store value of y direction in temp
 	sub $s3, $s3, $t3		# simulate negation by subtracting by itself twice
@@ -967,6 +990,13 @@ detect_collision:
 	
 	
 	wall_collision:
+	li $v0, 31					# play sound
+      	li $a0, 10
+      	li $a1, 100
+      	li $a2, 9
+      	li $a3, 100
+      	syscall
+	
 	# invert x direction
 	addi $t2, $s2, 0		# store value of x direction in temp
 	sub $s2, $s2, $t2		# simulate negation by subtracting by itself twice
@@ -1009,14 +1039,14 @@ detect_collision:
       	add $t4, $t4, $t1
       	bne $t4, 2, detect_collision_epi	# if $t4 is two, then the ball will collide with the paddle
       	
-      	
-      	# FIX SOUND
-      	#li $v0, 33					# play sound
-      	#li $a0, 32
-      	#li $a1, 10
-      	#li $a2, 5
-      	#li $a3, 100
-      	#syscall
+
+      	li $v0, 31					# play sound
+      	li $a0, 32
+      	li $a1, 100
+      	li $a2, 5
+      	li $a3, 100
+      	syscall
+
       	
       	
       	
